@@ -10,6 +10,17 @@ msg_header "ESCUDO FAIL2BAN (ANTI-ATAQUES)"
 echo -e "${YELLOW}[*] Instalando Fail2Ban...${NC}"
 install_deps fail2ban iptables ufw
 
+# FIX: los jails apuntan a /var/log/auth.log. En Debian 12/13 sin rsyslog ese
+# archivo NO existe y fail2ban falla al arrancar (quedando sin protección).
+if [[ ! -f /var/log/auth.log ]]; then
+    echo -e "${YELLOW}[*] /var/log/auth.log no existe: instalando rsyslog...${NC}"
+    apt-get install -y rsyslog > /dev/null 2>&1
+    systemctl enable --now rsyslog > /dev/null 2>&1
+    sleep 1
+    [[ -f /var/log/auth.log ]] && echo -e "${GREEN}[✔] auth.log creado${NC}" \
+        || echo -e "${RED}[!] No se pudo crear auth.log; el jail de dropbear podría fallar${NC}"
+fi
+
 cat << EOF > /etc/fail2ban/jail.local
 [DEFAULT]
 ignoreip = 127.0.0.1/8

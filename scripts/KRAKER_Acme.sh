@@ -27,14 +27,31 @@ issue_cert() {
     read -p "Ingresa tu Dominio/Subdominio: " DOMAIN
     [[ -z $DOMAIN ]] && echo -e "${RED}[!] Dominio requerido.${NC}" && sleep 2 && return
 
-    # Detener servicios que ocupan el puerto 80 temporalmente
-    echo -e "${YELLOW}[*] Liberando puerto 80...${NC}"
-    fuser -k 80/tcp > /dev/null 2>&1
+    # FIX CRÍTICO: antes hacía "fuser -k 80/tcp", que MATABA Dropbear (vive en el 80)
+    # y desconectaba a todos tus clientes para emitir un certificado.
+    # Ahora se detiene Dropbear de forma limpia y se vuelve a levantar al terminar.
+    local DROPBEAR_ESTABA=0
+    if systemctl is-active --quiet dropbear 2>/dev/null; then
+        DROPBEAR_ESTABA=1
+        echo -e "${YELLOW}[*] Deteniendo Dropbear unos segundos (vuelve al terminar)...${NC}"
+        systemctl stop dropbear > /dev/null 2>&1
+    fi
     systemctl stop apache2 nginx > /dev/null 2>&1
+    # Solo si algo ajeno sigue ocupando el 80
+    if ss -ntl 2>/dev/null | grep -q ":80 "; then
+        echo -e "${YELLOW}[!] El puerto 80 sigue ocupado por otro proceso.${NC}"
+        fuser -k 80/tcp > /dev/null 2>&1
+    fi
 
     echo -e "${YELLOW}[*] Solicitando certificado para $DOMAIN...${NC}"
     "$HOME/.acme.sh"/acme.sh --set-default-ca --server letsencrypt > /dev/null 2>&1
     "$HOME/.acme.sh"/acme.sh --issue -d "$DOMAIN" --standalone --force
+
+    # Devolver el servicio a su estado original pase lo que pase
+    if [[ $DROPBEAR_ESTABA -eq 1 ]]; then
+        systemctl start dropbear > /dev/null 2>&1
+        echo -e "${GREEN}[✔] Dropbear levantado de nuevo.${NC}"
+    fi
 
     if [[ -d "$HOME/.acme.sh/${DOMAIN}_ecc" ]]; then
         echo -e "${GREEN}[✔] Certificado emitido con éxito.${NC}"

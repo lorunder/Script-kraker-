@@ -108,10 +108,15 @@ add_user() {
     
     echo -e "${YELLOW}[*] Creando cuenta en el sistema...${NC}"
     
-    # Asegurar que /bin/false sea un shell válido
-    grep -q "^/bin/false" /etc/shells || echo "/bin/false" >> /etc/shells
+    # FIX CRÍTICO: antes se creaba con "-s /bin/false", y con esa shell el usuario
+    # NO puede iniciar sesión SSH/Dropbear (el túnel lo rechaza al instante).
+    # /bin/bash (sin home) es lo que necesitan los clientes de túnel.
+    # Si algún día quieres cuentas de solo reenvío, usa /usr/sbin/nologin + ForceCommand,
+    # pero NUNCA /bin/false.
+    SHELL_CLIENTE="/bin/bash"
+    grep -qx "$SHELL_CLIENTE" /etc/shells || echo "$SHELL_CLIENTE" >> /etc/shells
     
-    useradd -M -s /bin/false -e $EXP_DATE $USERNAME
+    useradd -M -s "$SHELL_CLIENTE" -e "$EXP_DATE" "$USERNAME"
     echo "$USERNAME:$PASSWORD" | chpasswd
     
     # Aplicar Límite SSH

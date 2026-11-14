@@ -30,6 +30,12 @@ setup_network() {
     msg_header "CONFIGURANDO PUERTO 53 UDP"
     # Asegurar DNS para que la VPS no se quede "ciega" tras apagar systemd-resolved
     echo -e "${YELLOW}[*] Asegurando conectividad DNS (8.8.8.8)...${NC}"
+    # FIX: se hacía backup? No. Ahora sí, para poder revertir.
+    [[ -f /etc/resolv.conf && ! -f /etc/resolv.conf.kraker-bak ]] && \
+        cp /etc/resolv.conf /etc/resolv.conf.kraker-bak
+    # Evitar duplicar la regla nat en cada ejecución
+    iptables -t nat -D PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300 2>/dev/null
+    iptables -D INPUT -p udp --dport 53 -j ACCEPT 2>/dev/null
     echo "nameserver 8.8.8.8" > /etc/resolv.conf
     echo "nameserver 1.1.1.1" >> /etc/resolv.conf
     

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KRAKER MASTER — Guía de instalación paso a paso</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0 auto; max-width: 820px; padding: 32px 28px 60px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #1a1d23; background: #fff; line-height: 1.6; font-size: 15px;
+  }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -.4px; }
+  h2 { font-size: 19px; margin: 36px 0 12px; padding-bottom: 6px; border-bottom: 2px solid #e8eaed; }
+  .sub { color: #6b7280; font-size: 14px; margin-bottom: 24px; }
+  .lead { background: #f8f9fb; border-left: 4px solid #2563eb; padding: 14px 18px; border-radius: 0 6px 6px 0; margin: 20px 0; }
+  .warn { background: #fff8e6; border-left: 4px solid #f59e0b; padding: 14px 18px; border-radius: 0 6px 6px 0; margin: 20px 0; }
+  .danger { background: #fef2f2; border-left: 4px solid #dc2626; padding: 14px 18px; border-radius: 0 6px 6px 0; margin: 20px 0; }
+  .ok { background: #f0fdf4; border-left: 4px solid #16a34a; padding: 14px 18px; border-radius: 0 6px 6px 0; margin: 20px 0; }
+  code { background: #f1f3f5; padding: 2px 6px; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; color: #b91c1c; }
+  pre { background: #1e2530; color: #e5e7eb; padding: 14px 16px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+  pre code { background: none; padding: 0; color: inherit; font-size: 13px; }
+  .step { border: 1px solid #e5e7eb; border-radius: 10px; padding: 18px 20px; margin: 16px 0; page-break-inside: avoid; }
+  .step h3 { margin: 0 0 10px; font-size: 17px; display: flex; align-items: center; gap: 10px; }
+  .num { background: #2563eb; color: #fff; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex: 0 0 auto; }
+  .menu { display: inline-block; background: #1e2530; color: #7dd3fc; padding: 2px 9px; border-radius: 5px; font-family: ui-monospace, monospace; font-size: 13px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+  th { background: #f8f9fb; font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .3px; color: #4b5563; }
+  .chk { list-style: none; padding-left: 0; }
+  .chk li { padding: 5px 0 5px 28px; position: relative; }
+  .chk li::before { content: "☐"; position: absolute; left: 4px; font-size: 17px; color: #9ca3af; }
+  .tag { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; text-transform: uppercase; letter-spacing: .4px; }
+  .t-req { background: #fee2e2; color: #991b1b; }
+  .t-opt { background: #e0e7ff; color: #3730a3; }
+  .t-ver { background: #dcfce7; color: #166534; }
+  .foot { margin-top: 44px; padding-top: 16px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 12px; text-align: center; }
+  @media print {
+    body { padding: 0; font-size: 12pt; max-width: 100%; }
+    .step { page-break-inside: avoid; }
+    pre { background: #f1f3f5; color: #111; border: 1px solid #d1d5db; }
+    h2 { page-break-after: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<h1>🐲 KRAKER MASTER</h1>
+<div class="sub">Guía de instalación — <strong>el orden SÍ importa</strong> · versión 3.0</div>
+
+<div class="lead">
+  <strong>Lee esto primero.</strong> El panel tiene 18 módulos, pero solo <strong>5 son obligatorios</strong> y
+  <strong>tienen un orden</strong>. Si te saltas uno, los puertos parecen abiertos pero nadie puede conectarse.
+  Sigue los pasos tal cual.
+</div>
+
+<h2>Antes de empezar</h2>
+<ul class="chk">
+  <li>VPS con <strong>Debian 11/12/13</strong> o <strong>Ubuntu 20.04 / 22.04 / 24.04</strong></li>
+  <li>Acceso <strong>root</strong> (o <code>sudo</code>)</li>
+  <li>Mínimo <strong>512 MB de RAM</strong> (1 GB recomendado)</li>
+  <li>Tener a mano el <strong>panel del proveedor</strong> (AWS, Hetzner, OVH, Vultr, Contabo) para abrir los puertos allá también</li>
+</ul>
+
+<div class="warn">
+  <strong>⚠️ El error #1 de todos:</strong> abrir los puertos solo dentro del VPS y olvidar el
+  <strong>firewall del proveedor</strong>. Son dos firewalls distintos. Si los puertos escuchan en el VPS
+  pero desde fuera no conecta, el bloqueo está en el panel del hosting.
+</div>
+
+<h2>Instalación (1 comando)</h2>
+<pre><code>bash &lt;(curl -fsSL https://raw.githubusercontent.com/lorunder/Script-kraker-/main/install.sh)</code></pre>
+<p>Al terminar, escribe <code>kraker</code> para abrir el panel.</p>
+
+<h2>Los 5 pasos obligatorios, en orden</h2>
+
+<div class="step">
+  <h3><span class="num">1</span> Dropbear <span class="tag t-req">obligatorio</span></h3>
+  <p>Menú <span class="menu">[10]</span> — Dropbear Manager</p>
+  <p><strong>Por qué primero:</strong> es el <em>destino</em> del túnel. Todo lo demás le apunta a él.
+  Si no está arriba, el 443 abre y cierra la conexión al instante.</p>
+  <p>Debe quedar escuchando en <strong>80, 143 y 442</strong>.</p>
+</div>
+
+<div class="step">
+  <h3><span class="num">2</span> Abrir puertos <span class="tag t-req">obligatorio</span></h3>
+  <p>Menú <span class="menu">[17]</span> — Abrir Puertos</p>
+  <p><strong>Por qué:</strong> abre 22, 80, 143, 442, 443 y 7100-7300 en el firewall del VPS.
+  El puerto 22 se abre <strong>siempre primero</strong>, para que no te quedes fuera.</p>
+  <p>Aprovecha y abre en el <strong>panel del proveedor</strong>: 22, 80, 143, 442, 443, 7100-7300 (TCP) y 443, 53, 5300 (UDP).</p>
+</div>
+
+<div class="step">
+  <h3><span class="num">3</span> SSL Gateway en modo PYTHON <span class="tag t-req">obligatorio</span></h3>
+  <p>Menú <span class="menu">[03]</span> → elige la opción <span class="menu">[2] PYTHON</span></p>
+  <p style="color:#6b7280; font-size:13.5px"><strong>Nota:</strong> <span class="menu">[03]</span> y <span class="menu">[04]</span> abren el mismo menú,
+  así que da igual cuál uses. Lo que importa es elegir <strong>2 = PYTHON</strong> adentro.</p>
+  <p><strong>Por qué Python y no Stunnel:</strong> tus clientes entran de dos formas distintas y
+  <strong>ambas usan el mismo puerto 443</strong>. El gateway de Python detecta solo:</p>
+  <table>
+    <tr><th>Lo que manda el cliente</th><th>Qué hace el gateway</th></tr>
+    <tr><td><code>GET / HTTP/1.1...</code> (payload WebSocket)</td><td>Responde <code>101</code> y quita las cabeceras</td></tr>
+    <tr><td><code>SSH-2.0-...</code> (SSL puro)</td><td>Pasa directo sin tocar nada</td></tr>
+    <tr><td>No manda nada (espera al servidor)</td><td>Pasa directo también</td></tr>
+  </table>
+  <p><strong>Stunnel solo sirve si TODOS tus clientes usan SSL puro.</strong> Si tienes mezcla, usa Python o los de payload no conectarán.</p>
+</div>
+
+<div class="step">
+  <h3><span class="num">4</span> UDP Gaming (BadVPN) <span class="tag t-req">obligatorio si hay Free Fire</span></h3>
+  <p>Menú <span class="menu">[08]</span> — UDP Gaming</p>
+  <p><strong>Por qué:</strong> convierte el UDP del juego en TCP para que pueda viajar por el túnel.
+  Sin esto, Free Fire no pasa.</p>
+  <p>Debe quedar escuchando en <strong>7100, 7200 y 7300</strong>.</p>
+  <div class="warn" style="margin:12px 0 0">
+    Ojo: esos puertos son <strong>TCP</strong>, aunque el módulo se llame "UDP Gaming".
+    El cliente se conecta por TCP.
+  </div>
+</div>
+
+<div class="step">
+  <h3><span class="num">5</span> Tuner Gaming <span class="tag t-req">recomendado</span></h3>
+  <p>Menú <span class="menu">[18]</span> — Tuner Gaming</p>
+  <p><strong>Por qué:</strong> activa BBR + <code>fq_codel</code> y agranda los buffers UDP.
+  Eso es lo que hace que el ping sea <strong>estable</strong> en vez de dar picos.</p>
+  <p>Te muestra el ping y el jitter <strong>antes y después</strong>. Si algo va mal, se deshace con
+  <code>bash scripts/KRAKER_Gaming.sh --revert</code>.</p>
+</div>
+
+<div class="step">
+  <h3><span class="num">6</span> Crear usuarios <span class="tag t-req">cuando ya funcione</span></h3>
+  <p>Menú <span class="menu">[12]</span> — Gestión de Usuarios</p>
+  <p>Primero comprueba que el túnel funciona tú mismo, y <strong>después</strong> creas cuentas.
+  Cada usuario recibe un comprobante con los puertos y datos de conexión.</p>
+</div>
+
+<h2>Verificación: lo único que importa</h2>
+<p>No te fíes del panel. Ejecuta esto y comprueba que salgan <strong>todos</strong> los puertos:</p>
+<pre><code>ss -ntl | grep -E ':(22|80|143|442|443|7100|7200|7300) '</code></pre>
+<p>Salida esperada (8 líneas con LISTEN):</p>
+<pre><code>LISTEN 0 4096 0.0.0.0:22    <- tu acceso SSH, NUNCA lo cierres
+LISTEN 0 1024 0.0.0.0:80    <- Dropbear
+LISTEN 0 1024 0.0.0.0:143   <- Dropbear
+LISTEN 0 1024 0.0.0.0:442   <- Dropbear
+LISTEN 0 2048 0.0.0.0:443   <- SSL Gateway
+LISTEN 0 2048 0.0.0.0:7100  <- BadVPN
+LISTEN 0 2048 0.0.0.0:7200  <- BadVPN
+LISTEN 0 2048 0.0.0.0:7300  <- BadVPN</code></pre>
+
+<div class="ok">
+  Si los 8 aparecen, la cadena está completa. Si falta el 443, repite el paso 3.
+  Si faltan 7100-7300, repite el paso 4.
+</div>
+
+<h2>Módulos opcionales</h2>
+<table>
+  <tr><th>Módulo</th><th>Para qué sirve</th><th>Cuándo usarlo</th></tr>
+  <tr><td><span class="menu">[19]</span> Monitor de Ping</td><td>Vigila si el ping se vuelve inestable y te dice la causa exacta</td><td>Déjalo instalado: <code>--install</code></td></tr>
+  <tr><td><span class="menu">[02]</span> Fail2Ban</td><td>Bloquea ataques de fuerza bruta al SSH</td><td>Si el VPS recibe ataques</td></tr>
+  <tr><td><span class="menu">[05]</span> Anti-MultiLogin</td><td>Corta sesiones que exceden el límite de cada usuario</td><td>Si revendes cuentas</td></tr>
+  <tr><td><span class="menu">[09]</span> SlowDNS</td><td>Túnel por DNS (para redes muy restringidas)</td><td>Solo si sabes configurar los NS del dominio</td></tr>
+  <tr><td><span class="menu">[14]</span> Gestor de Servicios</td><td>Ver estado real y logs de cada protocolo</td><td>Para diagnosticar algo caído</td></tr>
+</table>
+
+<h2>Problemas típicos y su solución</h2>
+<table>
+  <tr><th>Síntoma</th><th>Causa</th><th>Solución</th></tr>
+  <tr><td>El 443 dice abierto pero el cliente se desconecta al instante</td><td>Dropbear caído: el gateway no tiene a dónde reenviar</td><td>Repite el paso 1 y comprueba <code>ss -ntl | grep :80</code></td></tr>
+  <tr><td>Los puertos escuchan en el VPS pero desde fuera no conecta</td><td>Firewall del <strong>proveedor</strong> cerrado</td><td>Ábrelos en el panel del hosting (paso 2)</td></tr>
+  <tr><td>Free Fire conecta pero va con lag</td><td>BadVPN caído o sin tuner</td><td>Pasos 4 y 5, luego <code>[19]</code></td></tr>
+  <tr><td>El cliente de payload (WS) conecta y se queda colgado</td><td>Estás en modo Stunnel, no Python</td><td>Paso 3 en modo <span class="menu">[2] PYTHON</span></td></tr>
+  <tr><td>Se desconectan todos cada media hora</td><td>Cron duplicado de la versión vieja</td><td><code>sudo bash /root/kraker_master/update.sh</code></td></tr>
+  <tr><td>Te quedaste fuera del VPS</td><td>Firewall cerró el 22</td><td>Consola web del proveedor y <code>ufw allow 22/tcp</code></td></tr>
+</table>
+
+<h2>Lo que NO debes hacer</h2>
+<div class="danger">
+  <ul style="margin:0; padding-left:20px">
+    <li><strong>No actives UFW sin haber abierto el 22</strong> antes. Te quedas sin acceso al VPS.</li>
+    <li><strong>No uses <span class="menu">[20]</span> Desinstalar</strong> si tienes clientes activos: borra el panel y los scripts.</li>
+    <li><strong>No uses <span class="menu">[06]</span> Anti-Torrent</strong>: sus reglas no filtran el tráfico del túnel y pueden romper la navegación.</li>
+    <li><strong>No reinicies Dropbear</strong> desde el VPS con gente conectada: se les corta la sesión.</li>
+    <li><strong>No pidas a los clientes que usen Fortnite o LoL</strong>: un túnel TCP no transporta el UDP de esos juegos (ver anexo).</li>
+  </ul>
+</div>
+
+<h2>Anexo: qué darle al jugador</h2>
+<p>Datos que necesita cada cliente para conectarse (los genera el comprobante de <span class="menu">[12]</span>):</p>
+<table>
+  <tr><th>Campo</th><th>Valor</th></tr>
+  <tr><td>Host / IP</td><td>La IP o dominio de tu VPS</td></tr>
+  <tr><td>Puerto</td><td><code>443</code> (SSL / WS) · <code>80</code>, <code>143</code>, <code>442</code> (SSH directo)</td></tr>
+  <tr><td>Usuario y contraseña</td><td>Los que creaste en <span class="menu">[12]</span></td></tr>
+  <tr><td>Puerto UDP (Free Fire)</td><td><code>7100</code> · <code>7200</code> · <code>7300</code></td></tr>
+  <tr><td>Payload WS</td><td><code>GET / HTTP/1.1[crlf]Host: [host][crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf][crlf]</code></td></tr>
+</table>
+
+<div class="warn">
+  <strong>Alcance real en juegos.</strong>
+  <strong>Free Fire</strong> y juegos móviles con UDP sí funcionan (gracias a BadVPN).
+  <strong>Fortnite, LoL y Valorant en PC NO</strong>: necesitan UDP real (WireGuard). No es un problema
+  de configuración, es que un túnel TCP no puede transportar ese tráfico. No prometas lo que no hay.
+</div>
+
+<div class="foot">
+  KRAKER MASTER v3.0 — guía de instalación<br>
+  Documentación técnica completa en <code>AUDITORIA_KRAKER.md</code>
+</div>
+
+</body>
+</html>
