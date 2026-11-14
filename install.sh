@@ -55,7 +55,7 @@ apt-get install -y ufw lsof openssl net-tools screen > /dev/null 2>&1
 show_progress 1 "Descargando Panel..." 85
 REPO_DIR="/root/kraker_master"
 [[ -d "$REPO_DIR" ]] && rm -rf "$REPO_DIR"
-git clone https://github.com/underkraker/krakerscriptmx.git "$REPO_DIR" > /dev/null 2>&1
+git clone https://github.com/lorunder/Script-kraker-.git "$REPO_DIR" > /dev/null 2>&1
 
 # Set Permissions
 show_progress 1 "Configurando Scripts..." 95

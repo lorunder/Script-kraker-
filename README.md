@@ -22,7 +22,7 @@ Bienvenido al panel de gestión de VPS más avanzado y optimizado para **Gaming*
 Para instalar o actualizar el panel, ejecuta el siguiente comando en tu terminal como usuario **root**:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/underkraker/krakerscriptmx/main/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/lorunder/Script-kraker-/main/install.sh)
 ```
 
 ## 🛠️ Comandos Post-Instalación

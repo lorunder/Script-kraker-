@@ -46,7 +46,7 @@ cat <<EOF > "$BOT_DIR/config.py"
 TOKEN = "$BOT_TOKEN"
 ADMIN_ID = $ADMIN_ID
 VERSION = "v13.0 Master Shield 🛡️"
-INSTALL_CMD = "bash <(curl -fsSL https://raw.githubusercontent.com/underkraker/krakerscriptmx/main/install.sh)"
+INSTALL_CMD = "bash <(curl -fsSL https://raw.githubusercontent.com/lorunder/Script-kraker-/main/install.sh)"
 API_KEY = "KRAKER_MASTER_ELITE"
 EOF
 
