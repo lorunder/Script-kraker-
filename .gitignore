@@ -30,3 +30,6 @@ secrets/
 Thumbs.db
 *.swp
 *~
+
+# restos del repo viejo (submodulos rotos)
+/tmp/
