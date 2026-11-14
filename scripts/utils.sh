@@ -98,6 +98,7 @@ install_deps() {
 }
 
 setup_motd() {
+    mkdir -p /etc
     cat << 'EOF' > /etc/motd
   ██╗  ██╗██████╗  █████╗ ██╗  ██╗███████╗██████╗     ██╗   ██╗██████╗ ███████╗
   ██║ ██╔╝██╔══██╗██╔══██╗██║ ██╔╝██╔════╝██╔══██╗    ██║   ██║██╔══██╗██╔════╝
@@ -107,8 +108,12 @@ setup_motd() {
   ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝      ╚═══╝  ╚═╝     ╚══════╝
                                 BIENVENIDO A KRAKER VPS
 EOF
-    sed -i 's/#PrintMotd yes/PrintMotd yes/g' /etc/ssh/sshd_config
-    systemctl restart sshd > /dev/null 2>&1
+    # FIX: no reiniciar sshd (cortaba sesiones y en Debian el servicio es "ssh", no "sshd").
+    # Un reload es suficiente para MOTD y no tira a nadie.
+    if grep -q "^#PrintMotd yes" /etc/ssh/sshd_config 2>/dev/null; then
+        sed -i 's/^#PrintMotd yes/PrintMotd yes/g' /etc/ssh/sshd_config
+        sshd -t 2>/dev/null && systemctl reload ssh > /dev/null 2>&1
+    fi
 }
 
 # Módulo de Limpieza Master ♻️🚀
@@ -122,25 +127,38 @@ clean_vps_ram() {
 
 purge_ghost_sessions() {
     # 🏁 PURGADO DE SESIONES FANTASMA (LIBERAR CPU)
-    # Matar procesos de protocolos que no tienen usuarios reales (sockets muertos)
-    systemctl restart dropbear > /dev/null 2>&1
-    systemctl restart stunnel4 > /dev/null 2>&1
-    # Liberar RAM en cascada
+    # FIX CRÍTICO: aquí ANTES se hacía "systemctl restart dropbear" y
+    # "systemctl restart stunnel4". Como este script corre por cron cada 30
+    # minutos, eso DESCONECTABA A TODOS LOS USUARIOS cada media hora.
+    # Ahora solo se libera RAM; el reinicio de servicios queda en el Watchdog
+    # y únicamente si el servicio está REALMENTE caído.
     clean_vps_ram
+    # Opcional: si quieres cortar sesiones colgadas de un usuario concreto,
+    # usa "pkill -KILL -u <usuario>" desde AntiMulti, nunca reiniciar el daemon.
 }
 
 setup_auto_clean() {
-    # Programar Limpieza RAM cada 2 Horas
-    if ! crontab -l | grep -q "clean_vps_ram"; then
-        (crontab -l 2>/dev/null; echo "0 */2 * * * /usr/bin/kraker --ram-clean > /dev/null 2>&1") | crontab -
+    # FIX: los patrones de grep no coincidían con la línea escrita en el crontab,
+    # así que CADA VEZ que abrías el panel (/usr/bin/kraker) se AÑADÍA OTRA LÍNEA
+    # duplicada -> decenas de limpiezas por hora -> CPU a tope y cortes.
+    local CT
+    CT=$(crontab -l 2>/dev/null)
+    # Limpieza RAM cada 2 horas
+    if ! grep -q -- "--ram-clean" <<< "$CT"; then
+        (echo "$CT"; echo "0 */2 * * * /usr/bin/kraker --ram-clean > /dev/null 2>&1") | crontab -
+        CT=$(crontab -l 2>/dev/null)
     fi
-    # Programar Purgado Sesiones Fantasma (CPU) cada 30 Minutos para bajar del 500%
-    if ! crontab -l | grep -q "purge_ghost_sessions"; then
-        (crontab -l 2>/dev/null; echo "*/30 * * * * /usr/bin/kraker --cpu-clean > /dev/null 2>&1") | crontab -
+    # Purgado de sesiones cada 30 minutos
+    if ! grep -q -- "--cpu-clean" <<< "$CT"; then
+        (echo "$CT"; echo "*/30 * * * * /usr/bin/kraker --cpu-clean > /dev/null 2>&1") | crontab -
+        CT=$(crontab -l 2>/dev/null)
     fi
-    # Programar Bloqueo y Destrucción de Cuentas Expiradas (Diario 06:00 AM)
-    if ! crontab -l | grep -q "auto_clean"; then
-        (crontab -l 2>/dev/null; echo "0 6 * * * /usr/bin/bash /etc/kraker/scripts/KRAKER_System.sh auto_clean > /dev/null 2>&1") | crontab -
+    # Borrado de cuentas expiradas (diario 06:00) - FIX: usaba /etc/kraker/scripts que NO existe
+    if ! grep -q "auto_clean" <<< "$CT"; then
+        # Ruta calculada desde la ubicación real de utils.sh (funciona desde el menú y desde scripts/)
+        local _udir
+        _udir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        (echo "$CT"; echo "0 6 * * * /usr/bin/bash $_udir/KRAKER_System.sh auto_clean > /dev/null 2>&1") | crontab -
     fi
 }
 
@@ -156,10 +174,11 @@ get_active_ports() {
     local tcp_show=""
     local udp_show=""
     
-    for p in 80 443 143 442 2053 2083 2087 2096 4433; do
+    # FIX: 7100/7200/7300 los abre BadVPN por TCP (udpgw = UDP-over-TCP), NO por UDP
+    for p in 80 443 143 442 2053 2083 2087 2096 4433 7100 7200 7300; do
         ss -ntlp | grep -q ":$p " && tcp_show+="$p "
     done
-    for p in 443 53 5300 36712 7100 7200 7300; do
+    for p in 443 53 5300 36712; do
         ss -nulp | grep -q ":$p " && udp_show+="$p "
     done
     local output=""
@@ -182,10 +201,12 @@ setup_kraker_banner() {
 <br>
 EOF
     
-    # 1. Configurar SSH para usar este Banner
-    sed -i 's|^#Banner none|Banner /etc/kraker_banner|g' /etc/ssh/sshd_config
-    sed -i 's|^Banner.*|Banner /etc/kraker_banner|g' /etc/ssh/sshd_config
-    systemctl restart ssh > /dev/null 2>&1
+    # 1. Configurar SSH para usar este Banner (solo si cambió + reload, nunca restart)
+    if ! grep -q "^Banner /etc/kraker_banner" /etc/ssh/sshd_config 2>/dev/null; then
+        sed -i 's|^#Banner none|Banner /etc/kraker_banner|g' /etc/ssh/sshd_config
+        sed -i 's|^Banner.*|Banner /etc/kraker_banner|g' /etc/ssh/sshd_config
+        sshd -t 2>/dev/null && systemctl reload ssh > /dev/null 2>&1
+    fi
     
     # 2. Configurar Dropbear (Resolución del bug en Ubuntu 24.04+)
     if [[ -f /etc/default/dropbear ]]; then
@@ -194,8 +215,10 @@ EOF
         if grep -q "DROPBEAR_EXTRA_ARGS=" /etc/default/dropbear && ! grep -q "\-b /etc/kraker_banner" /etc/default/dropbear; then
             sed -i 's|DROPBEAR_EXTRA_ARGS="\(.*\)"|DROPBEAR_EXTRA_ARGS="\1 -b /etc/kraker_banner"|g' /etc/default/dropbear
             sed -i "s|DROPBEAR_EXTRA_ARGS='\(.*\)'|DROPBEAR_EXTRA_ARGS='\1 -b /etc/kraker_banner'|g" /etc/default/dropbear
+            # FIX: reiniciar dropbear CORTA a todos los usuarios conectados.
+            # Solo se reinicia si de verdad cambió la configuración del banner.
+            systemctl restart dropbear > /dev/null 2>&1
         fi
-        systemctl restart dropbear > /dev/null 2>&1
     fi
 }
 

@@ -74,7 +74,7 @@ Registrado en cron como `*/30 * * * * /usr/bin/kraker --cpu-clean` (`utils.sh:13
 
 **Esto es la causa número uno de "se desconectan".** Cada 30 minutos se reinicia Dropbear (todos los usuarios SSH del 80/143/442 pierden la conexión) y Stunnel (todo el tráfico SSL del 443). Y como el cron se duplica (ver punto 4), al tiempo tienes **varios reinicios por hora**.
 
-**Arreglo:** ya aplicado en `parches/utils.sh` — la función solo libera RAM; nunca reinicia servicios.
+**Arreglo:** ya aplicado en `scripts/utils.sh` — la función solo libera RAM; nunca reinicia servicios.
 
 ---
 
@@ -89,7 +89,7 @@ systemctl restart dropbear  # utils.sh:198
 
 Es decir: **cada vez que entras a `kraker`, expulsas a todos los conectados**. Lo mismo pasa en `setup_motd` (`utils.sh:111`) que se ejecuta desde el instalador de Dropbear, el de UDP y el de SlowDNS.
 
-**Arreglo:** en `parches/utils.sh` los reinicios son condicionales (solo si el archivo de configuración cambió) y se usa `systemctl reload ssh` en vez de `restart`.
+**Arreglo:** en `scripts/utils.sh` los reinicios son condicionales (solo si el archivo de configuración cambió) y se usa `systemctl reload ssh` en vez de `restart`.
 
 ---
 
@@ -136,7 +136,7 @@ Además:
 | `KRAKER_UDP.sh:16` | `net.ipv4.tcp_low_latency = 1` | Sysctl **eliminado del kernel en 4.12**; solo genera errores silenciosos |
 | `KRAKER_UDP.sh:22` | `default_qdisc = fq_codel` en `99-kraker-gaming.conf` | **Pelea** con `default_qdisc=fq` de `/etc/sysctl.conf` (que gana, se carga al final) → el "tuneo gaming" nunca se aplica |
 
-**Arreglo:** `parches/KRAKER_UDP.sh` valida el ELF + `--version`, quita FIFO/nice, añade `network-online.target`, abre TCP+UDP y **verifica de verdad** con `ss -ntl`.
+**Arreglo:** `scripts/KRAKER_UDP.sh` valida el ELF + `--version`, quita FIFO/nice, añade `network-online.target`, abre TCP+UDP y **verifica de verdad** con `ss -ntl`.
 
 ---
 
@@ -154,7 +154,7 @@ NO HAY regla para el 22 en NINGÚN script
 
 **Consecuencia:** si en algún momento activas UFW, pierdes el acceso SSH al VPS. Y si UFW está inactivo, las reglas que añade el panel **no filtran nada** (no son la causa de que "no abran": en ese caso el bloqueo está en el **firewall del proveedor**: AWS Security Group, Hetzner, OVH, Vultr, Contabo).
 
-**Arreglo:** nuevo `parches/KRAKER_Firewall.sh` que abre 22 primero, luego todo lo demás en TCP y UDP, y explica la diferencia firewall local vs. firewall del hosting.
+**Arreglo:** nuevo `scripts/KRAKER_Firewall.sh` que abre 22 primero, luego todo lo demás en TCP y UDP, y explica la diferencia firewall local vs. firewall del hosting.
 
 ---
 
@@ -174,7 +174,7 @@ Y cuando algo lo dispara:
 pkill -u "$user"    # mata TODAS las sesiones del usuario, incluidas las legítimas
 ```
 
-**Arreglo:** `parches/KRAKER_AntiMulti.sh` cuenta TTYs reales (`ps -u user -o tty=`) y cierra solo las sesiones que exceden el límite.
+**Arreglo:** `scripts/KRAKER_AntiMulti.sh` cuenta TTYs reales (`ps -u user -o tty=`) y cierra solo las sesiones que exceden el límite.
 
 ---
 
@@ -331,7 +331,7 @@ La opción "detener" ejecutaba `fuser -k 443/tcp 80/tcp 442/tcp 8080/tcp`.
 Como Dropbear vive en el **80**, al reiniciar el SSL **se mataba el destino del túnel**.
 El puerto 443 seguía abierto, pero todo lo que entraba moría. *(Bug #3)*
 
-**Arreglo:** `parches/KRAKER_SSL.sh` + `parches/KRAKER_SSL_Gateway.py`
+**Arreglo:** `scripts/KRAKER_SSL.sh` + `scripts/KRAKER_SSL_Gateway.py`
 — dos unidades systemd reales (`kraker-ssl.service`, `kraker-gateway.service`) que se
 excluyen entre sí en el 443, certificado que **no** se sobrescribe, verificación de que
 el destino está vivo, y gateway no bloqueante con límite de conexiones.
@@ -362,7 +362,7 @@ README anuncia pero el repo **no instala**.
 | `utils.sh:270` (`--cpu-clean`) | "Liberar CPU" reiniciando Dropbear cada 30 min: **no libera CPU, corta a los usuarios** |
 | `menu.sh:39` | "Test de velocidad" con `speedtest-cli`, que **no está en los repos de Debian** → siempre falla |
 
-### `parches/KRAKER_Gaming.sh` (nuevo) — lo que sí mueve la aguja
+### `scripts/KRAKER_Gaming.sh` (nuevo) — lo que sí mueve la aguja
 
 Aplica **solo las claves que existen en tu kernel** (comprueba `/proc/sys` antes de escribir):
 
@@ -399,9 +399,9 @@ Eso significa que un cliente puede tener ~1 segundo de datos encolados esperando
 el servidor los suelta en ráfaga y el ping da saltos. **El propio autor del código
 avisa de que sin limitarlo, la planificación no sirve de nada.**
 
-`parches/KRAKER_UDP.sh` ahora arranca con `--client-socket-sndbuf 131072` (128 KB).
+`scripts/KRAKER_UDP.sh` ahora arranca con `--client-socket-sndbuf 131072` (128 KB).
 
-### `parches/KRAKER_PingMonitor.sh` (nuevo) — saber POR QUÉ el ping no es estable
+### `scripts/KRAKER_PingMonitor.sh` (nuevo) — saber POR QUÉ el ping no es estable
 
 No basta con medir; hay que correlacionar. Cada muestra reporta:
 
@@ -448,51 +448,37 @@ cualquier worker que muera**. Se controla con `KRAKER_WORKERS` (por defecto
 
 ---
 
-## Cómo aplicar los parches
+## Cómo está organizado ahora
+
+Los archivos corregidos **ya son** los de `scripts/`. Ya no existe la carpeta `parches/`:
+lo que se instala es directamente la versión arreglada.
 
 ```bash
-cd /root/kraker_master
+# Instalación nueva
+bash <(curl -fsSL https://raw.githubusercontent.com/lorunder/Script-kraker-/main/install.sh)
 
-# 1. Backup
-cp -r /root/kraker_master /root/kraker_master.bak.$(date +%F)
-
-# 2. Aplicar
-cp parches/utils.sh               scripts/utils.sh
-cp parches/KRAKER_UDP.sh          scripts/KRAKER_UDP.sh
-cp parches/KRAKER_Services.sh     scripts/KRAKER_Services.sh
-cp parches/KRAKER_Dropbear.sh     scripts/KRAKER_Dropbear.sh
-cp parches/KRAKER_AntiMulti.sh    scripts/KRAKER_AntiMulti.sh
-cp parches/KRAKER_Firewall.sh     scripts/KRAKER_Firewall.sh
-cp parches/KRAKER_SSL.sh          scripts/KRAKER_SSL.sh
-cp parches/KRAKER_SSL_Gateway.py  scripts/KRAKER_SSL_Gateway.py
-chmod +x scripts/*.sh
-
-# 2b. Si solo usas SSL + Python (tu caso):
-bash scripts/KRAKER_Dropbear.sh      # el destino del túnel DEBE estar vivo
-bash scripts/KRAKER_SSL.sh           # luego elige [1] Stunnel o [2] Python
-
-# 3. Limpiar los cron duplicados que ya tengas
-crontab -l | grep -v -- "--ram-clean" | grep -v -- "--cpu-clean" | grep -v "KRAKER_Watchdog" | crontab -
-
-# 4. Reiniciar limpio
-systemctl daemon-reload
-systemctl restart dropbear stunnel4
-bash scripts/KRAKER_UDP.sh
+# Actualizar un VPS que ya tiene el panel
+sudo bash /root/kraker_master/update.sh
 ```
 
-Verificación final (esto es lo que importa, no lo que diga el panel):
+`update.sh` hace backup, `git pull`, limpia los cron duplicados que dejaba la versión
+anterior y reinicia los servicios que estuvieran activos. No borra configuración.
 
-```bash
-ss -ntl | grep -E ':(22|80|143|442|443|7100|7200|7300) '
-```
+Los módulos nuevos están accesibles desde el menú: `[17]` Abrir Puertos, `[18]` Tuner
+Gaming, `[19]` Monitor de Ping.
 
 ---
 
 ## Orden de trabajo recomendado
 
-1. **Parar el sangrado:** quitar los cron duplicados y el `restart` de `purge_ghost_sessions` → se acaban las desconexiones cada 30 min. *(`parches/utils.sh`)*
-2. **BadVPN:** reinstalar con `parches/KRAKER_UDP.sh` y comprobar `ss -ntl` en 7100/7200/7300.
-3. **Puertos:** correr `parches/KRAKER_Firewall.sh` y revisar el firewall del **proveedor**.
-4. **Usuarios:** cambiar `/bin/false` por `/bin/bash` en las cuentas nuevas.
-5. **fail2ban:** revisar baneos de tus propios clientes.
-6. **Pendiente de escribir:** los instaladores que faltan (Xray REALITY/VMess/Trojan con inbound real, Hysteria v2). El panel los anuncia, pero **no existen** en el repo.
+1. **Parar el sangrado:** los cron duplicados y el `restart` de `purge_ghost_sessions`
+   ya están corregidos en `scripts/utils.sh` → se acaban las desconexiones cada 30 min.
+2. **Dropbear:** menú `[10]` — el destino del túnel debe estar vivo antes que nada.
+3. **Puertos:** menú `[17]` y revisar también el firewall del **proveedor**.
+4. **Túnel:** menú `[03]` en modo **Python** (clientes mixtos WS + SSL).
+5. **BadVPN:** menú `[08]` y comprobar `ss -ntl` en 7100/7200/7300.
+6. **Latencia:** menú `[18]` para el tuneo y `[19]` para vigilar la estabilidad.
+7. **Usuarios:** cambiar `/bin/false` por `/bin/bash` en las cuentas nuevas.
+8. **fail2ban:** revisar baneos de tus propios clientes.
+9. **Pendiente:** instaladores de Xray REALITY/VMess/Trojan y Hysteria v2. El README
+   antiguo los anunciaba, pero **nunca existieron** en el repo.
