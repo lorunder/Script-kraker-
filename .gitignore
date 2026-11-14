@@ -1,0 +1,32 @@
+# Dependencias y cachés
+__pycache__/
+*.py[cod]
+*.egg-info/
+node_modules/
+
+# Backups locales de instalación
+*.bak
+*.bak.*
+kraker_master.bak.*
+kraker_sysctl_backup_*.tar.gz
+
+# Logs y estado de runtime
+*.log
+/var/
+tmp/
+
+# Credenciales y secretos (NUNCA subir)
+.env
+*.pem
+*.key
+id_rsa*
+.netrc
+.git-credentials
+*_token*
+secrets/
+
+# Basura del sistema
+.DS_Store
+Thumbs.db
+*.swp
+*~

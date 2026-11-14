@@ -49,6 +49,11 @@ main_menu() {
     echo -e "  ${CYAN}[02]${NC} Escudo Fail2Ban 🛡️  ${CYAN}[05]${NC} Anti-MultiLogin 🚫"
     echo -e "  ${RED}[06]${NC} Anti-Torrent P2P ⛔  ${CYAN}[16]${NC} Acelerador BBR 🚀"
     echo -e "  ${GRAY}[15]${NC} Banner De La App ✍️"
+    echo -e "${B_SEP}"
+    echo -e "  ${MAGENTA}══ RENDIMIENTO Y RED ══${NC}"
+    echo -e "  ${YELLOW}[17]${NC} Abrir Puertos 🔓    ${YELLOW}[18]${NC} Tuner Gaming 🎮"
+    echo -e "  ${YELLOW}[19]${NC} Monitor de Ping 📉"
+    echo -e "${B_SEP}"
     echo -e "  ${GRAY}[20]${NC} DESINSTALAR PANEL 🧹"
     echo -e "${B_SEP}"
     echo -e "                 ${RED}[00] SALIR DEL PANEL DE CONTROL${NC}"
@@ -81,6 +86,9 @@ main_menu() {
         14) bash "$SOURCE_DIR/scripts/KRAKER_Services.sh" ;;
         15) update_client_message ;;
         16) bash "$SOURCE_DIR/scripts/KRAKER_System.sh" enable_bbr ;;
+        17) bash "$SOURCE_DIR/scripts/KRAKER_Firewall.sh" ;;
+        18) bash "$SOURCE_DIR/scripts/KRAKER_Gaming.sh" ;;
+        19) bash "$SOURCE_DIR/scripts/KRAKER_PingMonitor.sh" ;;
         20) uninstall_panel ;;
         0|00) clear; echo -e "${GREEN}¡Hasta pronto!${NC}"; exit 0 ;;
         *) echo -e "${RED}Opción inválida!${NC}"; sleep 1 ;;

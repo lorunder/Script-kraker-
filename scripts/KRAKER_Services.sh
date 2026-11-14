@@ -1,95 +1,116 @@
 #!/bin/bash
-# KRAKER MASTER - Service Manager Utility
-# Versión 1.0 - Gestión de Puertos y Protocolos
+# KRAKER MASTER - Service Manager Utility  [VERSIÓN CORREGIDA]
+# Cambios:
+#  1) "DETENER SERVICIO" hacía  fuser -k 443/tcp 80/tcp 442/tcp 8080/tcp  -> mataba
+#     TAMBIÉN los demás protocolos que compartían esos puertos (Xray, Stunnel,
+#     Dropbear...). Eso es lo que hacía que "se cerraran puertos" que no tocabas.
+#  2) "INICIAR" hacía  pkill -9 -f "$service"  -> el patrón podía coincidir con
+#     otros procesos y mataba de más. Ahora solo se usa systemctl.
+#  3) Se muestra el estado real leyendo puertos (ss) además de systemd.
 
-# Cargar Librerías
 SOURCE_DIR=$(dirname "$(readlink -f "$0")")
 [[ -f "$SOURCE_DIR/utils.sh" ]] && source "$SOURCE_DIR/utils.sh" || exit 1
 
-# Listado de Servicios Clave (Unificado)
-# 1: Nombre Servicio/Proceso, 2: Etiqueta, 3: Tipo (systemd|screen|binary)
-SERVICES=("xray" "hysteria-server" "kraker_ssl" "kraker-dns" "badvpn-udpgw" "stunnel4" "dropbear")
-LABELS=("Xray (Reality/VMess/Trojan)" "Hysteria v2 (UDP 443)" "SSL Gateway (Python 443)" "SlowDNS (UDP 53)" "UDP Gaming (BandVPN)" "VPN SSL (Stunnel)" "SSH Dropbear")
-TYPES=("systemd" "systemd" "screen" "systemd" "binary" "systemd" "systemd")
+SERVICES=("xray" "hysteria-server" "kraker-udp" "kraker-dns" "stunnel4" "dropbear")
+LABELS=("Xray (Reality/VMess/Trojan)" "Hysteria v2 (UDP)" "BadVPN UDP Gaming (7100-7300 TCP)" "SlowDNS (UDP 53)" "SSL Gateway (Stunnel 443)" "SSH Dropbear (80/143/442)")
+TYPES=("systemd" "systemd" "systemd" "systemd" "systemd" "systemd")
+PORTS=("443" "443" "7100 7200 7300" "53" "443" "80 143 442")
 
-get_status() {
-    local type=$1
-    local name=$2
-    case $type in
-        systemd) systemctl is-active --quiet "$name" && echo -e "${GREEN}[ACTIVO]${NC}" || echo -e "${RED}[DETENIDO]${NC}" ;;
-        screen) screen -ls | grep -q "$name" && echo -e "${GREEN}[ACTIVO]${NC}" || echo -e "${RED}[DETENIDO]${NC}" ;;
-        binary) pgrep -f "$name" > /dev/null && echo -e "${GREEN}[ACTIVO]${NC}" || echo -e "${RED}[DETENIDO]${NC}" ;;
+# Estado combinado: unidad systemd + puerto escuchando
+svc_status() {
+    local name=$1 ports=$2
+    local unit_state port_state=""
+    if systemctl list-unit-files "${name}.service" > /dev/null 2>&1 && systemctl cat "$name" > /dev/null 2>&1; then
+        unit_state=$(systemctl is-active "$name" 2>/dev/null)
+    else
+        unit_state="no-existe"
+    fi
+    for p in $ports; do
+        if ss -ntl 2>/dev/null | grep -q ":$p " || ss -nul 2>/dev/null | grep -q ":$p "; then
+            port_state+="$p "
+        fi
+    done
+
+    case "$unit_state" in
+        active)   echo -e "${GREEN}[ACTIVO]${NC} ${GRAY}puertos: ${port_state:-ninguno}${NC}" ;;
+        failed)   echo -e "${RED}[FALLÓ]${NC} ${GRAY}${port_state:+puertos: $port_state}${NC}" ;;
+        no-existe) echo -e "${RED}[NO INSTALADO]${NC}" ;;
+        *)        echo -e "${YELLOW}[$unit_state]${NC} ${GRAY}${port_state:+puertos: $port_state}${NC}" ;;
     esac
 }
 
-manage_service() {
-    local service=$1
-    local label=$2
-    local type=$3
-    clear
-    msg_banner
-    msg_header "GESTIONANDO: $label"
-    echo -e "Estado Actual: $(get_status "$type" "$service")"
+service_diag() {
+    local name=$1
     echo -e "${BARRA}"
-    echo -e "  ${YELLOW}[1]${NC} INICIAR SERVICIO"
-    echo -e "  ${YELLOW}[2]${NC} DETENER SERVICIO (LIBERAR PUERTO)"
-    echo -e "  ${YELLOW}[3]${NC} REINICIAR SERVICIO"
-    echo -e "  ${YELLOW}[0]${NC} VOLVER"
+    echo -e "  ${YELLOW}Últimas líneas del log de $name:${NC}"
+    journalctl -u "$name" -n 8 --no-pager 2>/dev/null | sed 's/^/    /' || \
+        echo -e "    ${GRAY}(sin journal disponible)${NC}"
     echo -e "${BARRA}"
-    echo -en "Seleccione una acción: "
-    read cmd
+}
 
-    case $cmd in
-        1) 
-           # Inicio Limpio: Primero asegurar que el puerto esté libre
-           [[ $type == "systemd" ]] && systemctl stop "$service" > /dev/null 2>&1
-           [[ ! -z $service ]] && pkill -9 -f "$service" > /dev/null 2>&1
-           
-           [[ $type == "systemd" ]] && systemctl start "$service"
-           [[ $type == "screen" ]] && echo -e "${YELLOW}Inicia el servicio desde su instalador (04).${NC}" && sleep 2
-           [[ $type == "binary" ]] && echo -e "${YELLOW}Inicia el servicio desde su instalador (08).${NC}" && sleep 2
-           ;;
-        2) 
-           echo -e "${YELLOW}[*] Deteniendo de forma agresiva...${NC}"
-           [[ $type == "systemd" ]] && systemctl stop "$service"
-           [[ $type == "screen" ]] && screen -X -S "$service" quit > /dev/null 2>&1
-           [[ ! -z $service ]] && pkill -9 -f "$service" > /dev/null 2>&1
-           # Limpieza Final de Puertos
-           fuser -k 443/tcp 80/tcp 442/tcp 8080/tcp > /dev/null 2>&1
-           ;;
-        3) 
-           echo -e "${YELLOW}[*] Reiniciando Master...${NC}"
-           pkill -9 -f "$service" > /dev/null 2>&1
-           [[ $type == "systemd" ]] && systemctl restart "$service"
-           ;;
-        0) return ;;
-    esac
-    echo -e "${GREEN}✔ Acción completada!${NC}"
-    sleep 1
+manage_service() {
+    local service=$1 label=$2 ports=$3
+    while true; do
+        clear
+        msg_banner
+        msg_header "GESTIONANDO: $label"
+        echo -e "Estado: $(svc_status "$service" "$ports")"
+        echo -e "${BARRA}"
+        echo -e " Estado: $(svc_status "$service" "$ports")"
+        echo -e "  ${YELLOW}[1]${NC} INICIAR SERVICIO"
+        echo -e "  ${YELLOW}[2]${NC} DETENER SERVICIO (solo este)"
+        echo -e "  ${YELLOW}[3]${NC} REINICIAR SERVICIO"
+        echo -e "  ${YELLOW}[4]${NC} VER LOG / DIAGNÓSTICO"
+        echo -e "  ${YELLOW}[0]${NC} VOLVER"
+        echo -e "${BARRA}"
+        echo -en "Seleccione una acción: "
+        read -r cmd
+
+        case $cmd in
+            1)
+                systemctl start "$service" 2>&1 | sed 's/^/  /'
+                sleep 1
+                echo -e "  -> $(svc_status "$service" "$ports")"
+                [[ $(systemctl is-active "$service" 2>/dev/null) != "active" ]] && service_diag "$service"
+                ;;
+            2)
+                # FIX: se eliminó "fuser -k <puertos compartidos>" y "pkill -9 -f"
+                systemctl stop "$service" 2>&1 | sed 's/^/  /'
+                ;;
+            3)
+                systemctl restart "$service" 2>&1 | sed 's/^/  /'
+                sleep 1
+                echo -e "  -> $(svc_status "$service" "$ports")"
+                [[ $(systemctl is-active "$service" 2>/dev/null) != "active" ]] && service_diag "$service"
+                ;;
+            4) service_diag "$service" ;;
+            0) return 0 ;;
+        esac
+        echo -e "${YELLOW}Presiona ENTER para continuar...${NC}"
+        read -r
+    done
 }
 
 main_service_menu() {
     clear
     msg_banner
-    msg_header "GESTOR DE SERVICIOS KRAKER"
-    echo -e "Controla el encendido/apagado de cada puerto:"
+    msg_header "GESTOR DE SERVICIOS KRAKER (CORREGIDO)"
+    echo -e "Estado real de cada protocolo:"
     echo -e "${BARRA}"
-    
     for i in "${!SERVICES[@]}"; do
-        printf "  ${YELLOW}[%02d]${NC} %-30s %b\n" $((i+1)) "${LABELS[$i]}" "$(get_status "${TYPES[$i]}" "${SERVICES[$i]}")"
+        printf "  ${YELLOW}[%02d]${NC} %-34s %b\n" $((i+1)) "${LABELS[$i]}" "$(svc_status "${SERVICES[$i]}" "${PORTS[$i]}")"
     done
-    
     echo -e "${BARRA}"
     echo -e "  ${YELLOW}[00]${NC} VOLVER AL MENU PRINCIPAL"
     echo -e "${BARRA}"
     echo -en "Opción: "
-    read opt
+    read -r opt
 
     [[ $opt == "0" || $opt == "00" ]] && return 1
-    
+
     index=$((opt - 1))
     if [[ $index -ge 0 && $index -lt ${#SERVICES[@]} ]]; then
-        manage_service "${SERVICES[$index]}" "${LABELS[$index]}" "${TYPES[$index]}"
+        manage_service "${SERVICES[$index]}" "${LABELS[$index]}" "${PORTS[$index]}"
     else
         echo -e "${RED}Opción inválida!${NC}"
         sleep 1
@@ -97,7 +118,4 @@ main_service_menu() {
     return 0
 }
 
-# Bucle del Gestor
-while main_service_menu; do
-    :
-done
+while main_service_menu; do :; done
